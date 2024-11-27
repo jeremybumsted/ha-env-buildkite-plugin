@@ -1,0 +1,57 @@
+#!/bin/bash
+
+
+DIR="$(cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd)"
+
+# Check to see if we've got a regsitry configured
+if [[ -z "${BUILDKITE_PLUGIN_HA_ENV_REGISTRY:-}" ]]; then
+    echo "🚨 No registry found, exiting"
+    exit 1
+else
+    registry="${BUILDKITE_PLUGIN_HA_ENV_REGISTRY}"
+fi
+
+# Check for a Registry or API token, and use the token env if provided 
+if [[ -n "${BUILDKITE_PLUGIN_HA_ENV_TOKEN_ENV}" ]]; then
+    echo "using configured token from ${BUILDKITE_PLUGIN_HA_ENV_TOKEN_ENV}"
+    token=${!BUILDKITE_PLUGIN_HA_ENV_TOKEN_ENV}
+elif [[ -z "$BUILDKITE_REGISTRY_TOKEN" ]]; then 
+    echo "🚨 No registry token configured :("
+    exit 1
+else
+    token="$BUILDKITE_REGISTRY_TOKEN"
+fi
+
+# Use the configured org instead of the default if configured in the plugin
+
+if [[ -n "${BUILDKITE_PLUGIN_HA_ENV_ORGANIZATION}" ]]; then
+    org="${BUILDKITE_PLUGIN_HA_ENV_ORGANIZATION}"
+else
+    org="${BUILDKITE_ORGANIZATION}"
+fi
+
+
+# TODO: Enable individual script downloads (just environment, etc)
+# for right now, we'll just get all the hooks from the tarball uploaded to the registry.
+echo "+++ Downloading hooks from Package Registry: ${BUILDKITE_PLUGIN_HA_ENV_REGISTRY}"
+
+if ! curl -O -L -H "Authorization: Bearer $token" \
+  "https://packages.buildkite.com/${org}/${registry}/files/agent-hooks.tar.gz"; then
+    echo "🚨 failed to download hooks!"
+    exit 1
+fi
+
+# extract the hooks into the hooks directory for this plugin
+tar -xf "$DIR/../agent-hooks.tar.gz" -C "$DIR/../hooks"
+
+# update permissions for the hooks so they can be executed
+chmod +x "$DIR/../hooks/*"
+
+if [ -f "$DIR/hooks/environment" ]; then
+    echo "Extending environment hook"
+    # If the file exists, we want to source it to finish executing the environment hook as part of the plugin
+    # shellcheck disable=SC1091 
+    . "$DIR/../hooks/environment"
+fi
+
+echo "Done 🪝"

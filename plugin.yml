@@ -1,0 +1,15 @@
+name: "Hosted Agents Environment"
+description: "Configure reusable hooks for running in a hosted agents environment"
+author: "@jeremybumsted"
+public: true
+requirements:
+  - curl
+  - bash
+configuration:
+  properties:
+    token-env:
+      - string
+    registry:
+      - string
+    organization:
+      - string
